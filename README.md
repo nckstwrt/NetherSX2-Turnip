@@ -2,6 +2,9 @@
 
 NetherSX2 with Adreno Turnip Driver support
 
+# Download
+[Releases](https://github.com/nckstwrt/NetherSX2-Turnip/releases)
+
 ## Description
 
 NetherSX2 (formerly AetherSX2) does not support selecting a Turnip driver for Qualcomm based devices. This solution provides inbuilt support for Turnip drivers to provide better performance when using Vulkan rendering in NetherSX (Android PlayStation 2 emulation)
@@ -33,6 +36,8 @@ With NetherSX2-Turnip on my Retroid SD865 devices I can run taxing games like Sl
 ## Tips
 
 There is one setting that can make a big difference and that is Hardware Download Mode (under Graphics). Setting this from Accurate to Disable Readbacks can make quite a difference with only rare graphical effects. Worth experimenting with to get games like Nascar 2004 Thunder working at maximum speed.
+
+Additionally, for the Need For Speed games at least, setting Blending to Minimum can make a big difference on lower powered devices.
 
 ## NetherSX2 Classic / v3668
 
