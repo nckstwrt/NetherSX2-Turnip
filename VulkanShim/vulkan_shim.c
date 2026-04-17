@@ -593,6 +593,7 @@ int get_adreno_model(char *value) {
         if (strstr(value, "SM8850")) return 840;  /* 8 Elite Gen 5 / Elite 2 */
         if (strstr(value, "SM8845")) return 830;  /* 8 Gen 5 (flagship variant) */
         if (strstr(value, "SM8750")) return 830;  /* 8 Elite Gen 4 */
+        if (strstr(value, "SM8735")) return 825;  /* 8s Gen 4 */
 		
         /* extend as needed */
 		if (value[0] != 0) return 0;		// If we got a value just return the string
