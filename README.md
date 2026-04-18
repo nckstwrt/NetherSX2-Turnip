@@ -42,4 +42,4 @@ Additionally, for the **Need For Speed** games at least, setting Blending to Min
 
 ## NetherSX2 Classic / v3668
 
-I have made the same changes to NetherSX2 Classic - but the additions are not worth releasing as the benefits from NetherSX2 Classic come from the OpenGL renderer. But if anyone wants it I can release it too.
+I have made the same changes to NetherSX2 Classic -  the additions may not be worth as much as people expect as the benefits from NetherSX2 Classic come from the OpenGL renderer as much as anything. But have released it now and will continue to do so alongside the regular 4248 version.
