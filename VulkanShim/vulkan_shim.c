@@ -183,6 +183,22 @@ static void hooked_CmdCopyImageToBuffer2(
         g_real_copy_itb2(cmdBuf, pInfo);
 }
 
+VkResult hooked_EnumeratePhysicalDevices(VkInstance inst, uint32_t *pCount, void *pDevs) {
+    static VkResult (*real_fn)(VkInstance, uint32_t*, void*) = NULL;
+    if (!real_fn && g_sys_vulkan)
+        real_fn = (VkResult (*)(VkInstance, uint32_t*, void*))
+            dlsym(g_sys_vulkan, "vkEnumeratePhysicalDevices");
+    if (!real_fn) {
+        LOGE("VulkanShim: vkEnumeratePhysicalDevices not resolved");
+        return -3;
+    }
+    
+    VkResult res = real_fn(inst, pCount, pDevs);
+    LOGI("VulkanShim: vkEnumeratePhysicalDevices count=%u result=%d pDevs=%p",
+         pCount ? *pCount : 0, res, pDevs);
+    return res;
+}
+
 /* The real android_load_sphal_library so we can call it for non-Vulkan */
 static void *(*g_real_sphal_load)(const char *name, int flags) = NULL;
 
@@ -593,6 +609,7 @@ int get_adreno_model(char *value) {
         if (strstr(value, "SM8850")) return 840;  /* 8 Elite Gen 5 / Elite 2 */
         if (strstr(value, "SM8845")) return 830;  /* 8 Gen 5 (flagship variant) */
         if (strstr(value, "SM8750")) return 830;  /* 8 Elite Gen 4 */
+		if (strstr(value, "SM8735")) return 825;  /* 8s Gen 4 */
 		
         /* extend as needed */
 		if (value[0] != 0) return 0;		// If we got a value just return the string
@@ -840,7 +857,7 @@ PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice dev, const char *name);
 /* ------------------------------------------------------------------ */
 /* Custom vkGetInstanceProcAddr — also intercepts readback commands     */
 /* ------------------------------------------------------------------ */
-/*
+
 PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance inst, const char *name) {
     LOGI("VulkanShim: vkGetInstanceProcAddr called");
 
@@ -856,6 +873,7 @@ PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance inst, const char *name) {
     PFN_vkVoidFunction fn = real_gipa(inst, name);
 
     if (name) {
+		/*
         if (strcmp(name, "vkCmdPipelineBarrier") == 0 && fn) {
             g_vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)fn;
             LOGI("VulkanShim: captured vkCmdPipelineBarrier (via GIPA) = %p", fn);
@@ -873,17 +891,22 @@ PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance inst, const char *name) {
             LOGI("VulkanShim: intercepting vkCmdCopyImageToBuffer2KHR (via GIPA) = %p", fn);
             return (PFN_vkVoidFunction)hooked_CmdCopyImageToBuffer2;
         }
-
+		*/
         // Return our own vkGetDeviceProcAddr so the interception chain works 
         if (strcmp(name, "vkGetDeviceProcAddr") == 0) {
             LOGI("VulkanShim: returning hooked vkGetDeviceProcAddr");
             return (PFN_vkVoidFunction)vkGetDeviceProcAddr;
         }
+		
+		if (name && strcmp(name, "vkEnumeratePhysicalDevices") == 0) {
+			LOGI("VulkanShim: returning forwarded vkEnumeratePhysicalDevices");
+			return (PFN_vkVoidFunction)hooked_EnumeratePhysicalDevices;
+		}
     }
 
     return fn;
 }
-*/
+
 typedef void (*PFN_vkCmdCopyImageToBuffer)(
     VkCommandBuffer, uint64_t /*VkImage*/, uint32_t /*VkImageLayout*/,
     uint64_t /*VkBuffer*/, uint32_t /*regionCount*/, const void* /*pRegions*/);
@@ -920,7 +943,7 @@ static void hooked_CmdCopyImageToBuffer_v1(
 /* ------------------------------------------------------------------ */
 /* Custom vkGetDeviceProcAddr — intercepts readback commands            */
 /* ------------------------------------------------------------------ */
-/*
+
 PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice dev, const char *name) {
     LOGI("VulkanShim: vkGetDeviceProcAddr called for: %s", name ? name : "NULL");
 
@@ -936,6 +959,7 @@ PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice dev, const char *name) {
     PFN_vkVoidFunction fn = real_gdpa(dev, name);
 
     if (name) {
+		/*
         // Capture vkCmdPipelineBarrier when first resolved 
         if (strcmp(name, "vkCmdPipelineBarrier") == 0) {
             g_vkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)fn;
@@ -962,19 +986,26 @@ PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice dev, const char *name) {
             g_real_copy_itb_v1 = (PFN_vkCmdCopyImageToBuffer)fn;
             LOGI("VulkanShim: intercepting vkCmdCopyImageToBuffer (v1) = %p", fn);
             return (PFN_vkVoidFunction)hooked_CmdCopyImageToBuffer_v1;
-        }
+        }*/
+		
+		if (name && strcmp(name, "vkEnumeratePhysicalDevices") == 0) {
+			return (PFN_vkVoidFunction)hooked_EnumeratePhysicalDevices;
+		}
     }
 
     return fn;
 }
-*/
+
+/*
 FORWARD_PFN(vkGetInstanceProcAddr,
     (VkInstance inst, const char *name),
     (inst, name))
 
+
 FORWARD_PFN(vkGetDeviceProcAddr,
     (VkDevice dev, const char *name),
     (dev, name))
+*/
 
 FORWARD_VOID(vkDestroyInstance,
     (VkInstance inst, const void *pAlloc),
@@ -991,4 +1022,8 @@ FORWARD_VK(vkEnumerateInstanceLayerProperties,
 FORWARD_VK(vkEnumerateInstanceVersion,
     (uint32_t *pVer),
     (pVer))
+	
+FORWARD_VK(vkEnumeratePhysicalDevices,
+    (VkInstance inst, uint32_t *pCount, void *pDevs),
+    (inst, pCount, pDevs))
 	
