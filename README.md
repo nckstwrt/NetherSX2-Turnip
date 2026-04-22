@@ -38,8 +38,10 @@ With NetherSX2-Turnip on my Retroid SD865 devices I can run taxing games like Sl
 
 There is one setting that can make a big difference and that is Hardware Download Mode (under Graphics). Setting this from Accurate to Disable Readbacks can make quite a difference with only rare graphical effects. Worth experimenting with to get games like **Nascar 2004 Thunder** working at maximum speed.
 
-Additionally, for the **Need For Speed** games at least, setting Blending to Minimum can make a big difference on lower powered devices.
+Additionally, for the **Need For Speed** games at least, setting Blending Accuracy to Minimum can make a big difference on lower powered devices.
+
+For **The Getaway** set Blending Accuracy to High (gets rid of the white fog), Hardware Download Mode to Disable Readbacks and EE Cycle Rate to 60% (-2)
 
 ## NetherSX2 Classic / v3668
 
-I have made the same changes to NetherSX2 Classic - but the additions are not worth releasing as the benefits from NetherSX2 Classic come from the OpenGL renderer. But if anyone wants it I can release it too.
+I have made the same changes to NetherSX2 Classic -  the additions may not be worth as much as people expect as the benefits from NetherSX2 Classic come from the OpenGL renderer as much as anything. But have released it now and will continue to do so alongside the regular 4248 version.
