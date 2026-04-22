@@ -770,6 +770,7 @@ extern "C" int get_adreno_model(char *value) {
         if (strstr(value, "SM8850")) return 840;  /* 8 Elite Gen 5 / Elite 2 */
         if (strstr(value, "SM8845")) return 830;  /* 8 Gen 5 (flagship variant) */
         if (strstr(value, "SM8750")) return 830;  /* 8 Elite Gen 4 */
+		if (strstr(value, "CQ8725S")) return 830; /* Dragonwing Q8 */
 		if (strstr(value, "SM8735")) return 825;  /* 8s Gen 4 */
 		
         /* extend as needed */
@@ -815,15 +816,6 @@ extern "C" void setup_turnip_env(int noubwc, int nolrz, int flushall) {
 /* Constructor                                                         */
 /* ------------------------------------------------------------------ */
 
-/*
-extern "C" void shim_init(void) {
-    __android_log_print(ANDROID_LOG_ERROR, "VULKAD", "INIT RUN");
-}
-
-__attribute__((section(".init_array"), used))
-static void (*init_ptr)(void) = shim_init;
-*/
-
 void public_resolve_linker_symbols();
 
 extern "C" __attribute__((constructor, used))
@@ -864,7 +856,7 @@ void shim_init(void) {
 		LOGI("VulkanShim: Using Override");
 	}
 	else {
-		if (strcmp(value, "SM8250") == 0 || strcasecmp(value, "kona") == 0) {
+		if (strcmp(value, "SM8250") == 0 || strcasecmp(value, "kona") == 0 || strcmp(value, "SM6125") == 0 || strcasecmp(value, "trinket") == 0) {
 			snprintf(g_turnip_path, sizeof(g_turnip_path), "%slibvulkan_freedreno_v24.1.0_R18.a6xx-Patched.so", g_lib_dir);		// For SD865 - Use a patched Turnip. Change Hardware mode to Disable Readbacks if crashing.
 			LOGI("VulkanShim: Using Kona specific driver");
 		} else {
@@ -934,7 +926,7 @@ void shim_init(void) {
 			}
 		}
 	}
-	LOGI("tmpDir = %s", tmpDir);
+	LOGI("VulkanShim: tmpDir = %s", tmpDir);
 
 	if (!linkernsbypass_load_status())
 		LOGE("VulkanShim: Failed to linkernsbypass_load_status");
@@ -1120,6 +1112,69 @@ FORWARD_VK(vkCreateInstance,
 /* Forward declaration — defined below vkGetInstanceProcAddr */
 extern "C" PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice dev, const char *name);
 
+/* Wrapper to log what the app sees when it queries the GPU */
+static void (*real_GetPhysicalDeviceProperties)(void*, void*) = NULL;
+
+static void hooked_GetPhysicalDeviceProperties(void *physDev, void *pProps) {
+    if (real_GetPhysicalDeviceProperties)
+        real_GetPhysicalDeviceProperties(physDev, pProps);
+    
+    if (pProps) {
+        /* VkPhysicalDeviceProperties layout:
+           uint32_t apiVersion       offset 0
+           uint32_t driverVersion    offset 4
+           uint32_t vendorID         offset 8
+           uint32_t deviceID         offset 12
+           uint32_t deviceType       offset 16
+           char     deviceName[256]  offset 20 */
+        uint32_t *u = (uint32_t*)pProps;
+        char *name = (char*)pProps + 20;
+        LOGI("VulkanShim: PhysDevProps: api=%u.%u.%u driver=%u vendor=0x%x device=0x%x type=%u name=%s",
+             u[0] >> 22, (u[0] >> 12) & 0x3ff, u[0] & 0xfff,
+             u[1], u[2], u[3], u[4], name);
+    }
+}
+
+static void (*real_GetPhysicalDeviceFeatures)(void*, void*) = NULL;
+
+static void hooked_GetPhysicalDeviceFeatures(void *physDev, void *pFeatures) {
+    if (real_GetPhysicalDeviceFeatures)
+        real_GetPhysicalDeviceFeatures(physDev, pFeatures);
+    
+    if (pFeatures) {
+        /* VkPhysicalDeviceFeatures is 55 VkBool32s. Log the key ones NetherSX2 likely checks */
+        uint32_t *f = (uint32_t*)pFeatures;
+        LOGI("VulkanShim: Features: robustBufferAccess=%u geometryShader=%u tessellation=%u "
+             "sampleRateShading=%u dualSrcBlend=%u logicOp=%u multiDrawIndirect=%u "
+             "depthClamp=%u depthBiasClamp=%u fillModeNonSolid=%u wideLines=%u "
+             "largePoints=%u samplerAnisotropy=%u fragmentStoresAndAtomics=%u "
+             "shaderInt64=%u",
+             f[0], f[4], f[5],
+             f[6], f[7], f[10], f[11],
+             f[12], f[13], f[14], f[17],
+             f[18], f[20], f[28],
+             f[34]);
+    }
+}
+
+static VkResult (*real_EnumDeviceExtProps)(void*, const char*, uint32_t*, void*) = NULL;
+
+static VkResult hooked_EnumDeviceExtProps(void *physDev, const char *pLayer, 
+                                           uint32_t *pCount, void *pProps) {
+    VkResult r = real_EnumDeviceExtProps(physDev, pLayer, pCount, pProps);
+    
+    if (r == 0 && pProps && pCount) {
+        /* Each VkExtensionProperties is 260 bytes: char[256] + uint32_t */
+        for (uint32_t i = 0; i < *pCount; i++) {
+            char *extName = (char*)pProps + (i * 260);
+            LOGI("VulkanShim: DevExt[%u]: %s", i, extName);
+        }
+    } else if (r == 0 && !pProps && pCount) {
+        LOGI("VulkanShim: DevExt count = %u", *pCount);
+    }
+    return r;
+}
+
 /* ------------------------------------------------------------------ */
 /* Custom vkGetInstanceProcAddr — also intercepts readback commands     */
 /* ------------------------------------------------------------------ */
@@ -1158,6 +1213,20 @@ extern "C" PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance inst, const char 
             return (PFN_vkVoidFunction)hooked_CmdCopyImageToBuffer2;
         }
 		*/
+		
+		if (strcmp(name, "vkGetPhysicalDeviceProperties") == 0 && fn) {
+			real_GetPhysicalDeviceProperties = (void (*)(void*, void*))fn;
+			return (PFN_vkVoidFunction)hooked_GetPhysicalDeviceProperties;
+		}
+		if (strcmp(name, "vkGetPhysicalDeviceFeatures") == 0 && fn) {
+			real_GetPhysicalDeviceFeatures = (void (*)(void*, void*))fn;
+			return (PFN_vkVoidFunction)hooked_GetPhysicalDeviceFeatures;
+		}
+		if (strcmp(name, "vkEnumerateDeviceExtensionProperties") == 0 && fn) {
+			real_EnumDeviceExtProps = (VkResult (*)(void*, const char*, uint32_t*, void*))fn;
+			return (PFN_vkVoidFunction)hooked_EnumDeviceExtProps;
+		}
+
         // Return our own vkGetDeviceProcAddr so the interception chain works 
         if (strcmp(name, "vkGetDeviceProcAddr") == 0) {
             LOGI("VulkanShim: returning hooked vkGetDeviceProcAddr");
