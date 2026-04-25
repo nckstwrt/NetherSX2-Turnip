@@ -2,6 +2,8 @@
 
 NetherSX2 with Adreno Turnip Driver support
 
+*** **THIS IS ONLY FOR QUALCOMM (i.e. Adreno) BASED SYSTEMS** ***
+
 # Download
 [Releases](https://github.com/nckstwrt/NetherSX2-Turnip/releases)
 
