@@ -786,9 +786,9 @@ extern "C" void setup_turnip_env(int noubwc, int nolrz, int flushall) {
     char buf[256] = {0};
     char *p = buf;
 
-    if (noubwc)  p += sprintf(p, "noubwc,");
-    if (nolrz)   p += sprintf(p, "nolrz,");
-    if (flushall) p += sprintf(p, "flushall,");
+    if (noubwc)  p += snprintf(p, buf + sizeof(buf) - p, "noubwc,");
+    if (nolrz)   p += snprintf(p, buf + sizeof(buf) - p, "nolrz,");
+    if (flushall) p += snprintf(p, buf + sizeof(buf) - p, "flushall,");
 
     // Strip trailing comma
     if (p > buf) *(p - 1) = '\0';
@@ -1014,7 +1014,7 @@ void shim_init(void) {
 	const char *everything_else_driver =  "libvulkan_freedreno_T28.so"; // "libvulkan_freedreno_v26.2.0_R4.so";
 	if (access(override_path, F_OK) == 0) 
 	{
-		strcpy(g_turnip_path, override_path);
+		snprintf(g_turnip_path, sizeof(g_turnip_path), "%s", override_path);
 		driver_dir = "/data/local/tmp/";
 		LOGI("VulkanShim: Using Override");
 	}
